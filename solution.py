@@ -1,5 +1,5 @@
 import string
-
+import logging
 
 assignments = []
 SQUARE_SIZE = 3
@@ -21,9 +21,19 @@ COL_UNITS = [cross(ROWS, c) for c in COLS]
 SQUARE_UNITS = [cross(r, c) \
     for r in [ROWS[n:n+SQUARE_SIZE] for n in range(0, len(ROWS), SQUARE_SIZE)]\
     for c in [COLS[n:n+SQUARE_SIZE] for n in range(0, len(COLS), SQUARE_SIZE)]]
-UNITLIST = ROW_UNITS + COL_UNITS + SQUARE_UNITS + DIAGONAL_UNITS
-UNITS = dict((box, [u for u in UNITLIST if box in u]) for box in BOXES)
-PEERS = dict((box, set(sum(UNITS[box], [])) - set([box])) for box in BOXES)
+
+
+UNITLIST = []
+UNITS = {}
+PEERS = {}
+
+def sudoku_init(diagonal=True):
+    global UNITLIST, UNITS, PEERS
+    UNITLIST = ROW_UNITS + COL_UNITS + SQUARE_UNITS
+    if diagonal:
+        UNITLIST += DIAGONAL_UNITS
+    UNITS = dict((box, [u for u in UNITLIST if box in u]) for box in BOXES)
+    PEERS = dict((box, set(sum(UNITS[box], [])) - set([box])) for box in BOXES)
 
 def grid_values(grid):
     """
@@ -36,17 +46,23 @@ def grid_values(grid):
         Values: The value in each box, e.g. '8'.
         If the box has no value, then the value will be '123456789'.
     """
-    if len(grid) != len(BOXES):
-        raise Exception("Bad Input")
+    assert(len(grid) == len(BOXES))
     return dict(zip(BOXES, [n if n in COLS else COLS for n in grid]))
 
-def display(values):
+def display(values, note=""):
     """
     Display the values as a 2-D grid.
-    Args:
-        values(dict): The sudoku in dictionary form
+    Input: The sudoku in dictionary form
+    Output: None
     """
-    print(values)
+    logging.info(note)
+    width = 1+max(len(values[s]) for s in BOXES)
+    line = '+'.join(['-'*(width*3)]*3)
+    for r in ROWS:
+        logging.info(''.join(values[r+c].center(width)+('|' if c in '36' else '')
+                      for c in COLS))
+        if r in 'CF': logging.info(line)
+    return
 
 
 def assign_value(values, box, value):
@@ -55,8 +71,8 @@ def assign_value(values, box, value):
     Assigns a value to a given box. If it updates the board record it.
     """
     values[box] = value
-    if len(value) == 1:
-        assignments.append(values.copy())
+    #if len(value) == 1:
+    #    assignments.append(values.copy())
     return values
 
 def naked_twins(values):
@@ -126,17 +142,22 @@ def only_choice(values):
 def reduce_puzzle(values):
     """iteratively apply the reductions on the sudoku puzzle till we can reduce no further
     """
+    display(values, "start reduce cycle")
     progressing = True
     while progressing:
         before = solved_boxes(values)
         #eliminate
         values = eliminate(values)
+        display(values, "after eliminate")
         #only_choice
         values = only_choice(values)
+        display(values, "after only_choice")
         #naked_twins
         values = naked_twins(values)
+        display(values, "after naked_twin")
         after = solved_boxes(values)
         if has_empty_boxes(values):
+            display(values, "has empty")
             return False
         progressing = after != before
     return values
@@ -160,7 +181,7 @@ def search(values):
             return result
     return False
 
-def solve(grid):
+def solve(grid, diagonal=True):
     """
     Find the solution to a Sudoku grid.
     Args:
@@ -169,6 +190,7 @@ def solve(grid):
     Returns:
         The dictionary representation of the final sudoku grid. False if no solution exists.
     """
+    sudoku_init(diagonal)
     return search(grid_values(grid))
 
 if __name__ == '__main__':
@@ -181,4 +203,4 @@ if __name__ == '__main__':
     except SystemExit:
         pass
     except:
-        print('We could not visualize your board due to a pygame issue. Not a problem! It is not a requirement.')
+        logging.warn('We could not visualize your board due to a pygame issue. Not a problem! It is not a requirement.')
